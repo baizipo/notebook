@@ -38,28 +38,29 @@
 	pnputil -i -a d:\vioserial\2k8R2\amd64\*.INF
 	pnputil -i -a d:\viostor\2k8R2\amd64\*.INF
 	```
-3. 我的电脑 --> 属性 --> 高级系统设置 --> 远程 --> 允许运行任意版本远程桌面的计算机连接
-4. 开始 --> 控制面板 --> Windows 防火墙 --> 高级设置 --> Windows 防火墙属性 --> 域配置文件 & 专用配置文件 & 公用配置文件 --> 防火墙状态 --> 关闭 
-5. 控制面板--->windows update--->检查更新--->立即更新
-6. 安装python
-7. 重启虚拟机
-8. 添加修改密码脚本
+
+3. 开启服务
+
+        1. 拷贝`Balloon/2K8R2/amd64/`目录下所有文件到`c:/Program files/Balloon/`目录下
+        2. 使用管理员权限打开`cmd`
+        3. 进入目录`c:/Program files/Balloon/`
+        4. 安装服务:`BLNSVR.exe -i`
+
+4. 我的电脑 --> 属性 --> 高级系统设置 --> 远程 --> 允许运行任意版本远程桌面的计算机连接
+5. 开始 --> 控制面板 --> Windows 防火墙 --> 高级设置 --> Windows 防火墙属性 --> 域配置文件 & 专用配置文件 & 公用配置文件 --> 防火墙状态 --> 关闭 
+6. 控制面板--->windows update--->检查更新--->立即更新
+7. 安装python
+8. 重启虚拟机
+9. 添加修改密码脚本
 	1. 开始 --> 运行 --> mmc 
 	2. 文件 --> 添加/删除管理单元
 	3. 组策略对象编辑器 --> 添加 --> 确定
 	4. 本地计算机 策略 --> 计算机配置 --> Windows 设置 --> 脚本(启动/关机) --> 启动
 	5. 添加 --> 脚本路径 --> 确定 
 	6. 保存控制台 --> 保存到默认路径下就可以了
-9. run sysperp
+10. run sysperp
 	1. Untitled.xml拷贝到c:\Windows\System32\sysprep
 	2. sysprep /generalize /oobe /shutdown /unattend:C:\Windows\System32\sysprep\Untitled.xml
-	
-10. 补充`balloon`：
-
-	1. 拷贝`Balloon/2K8R2/amd64/`目录下所有文件到`c:/Program files/Balloon/`目录下
-	2. 使用管理员权限打开`cmd`
-	3. 进入目录`c:/Program files/Balloon/`
-	4. 安装服务:`BLNSVR.exe -i`
 	
 	> ##### 重要：
 	> ###### 运行sysperp后会自动关机，需要手动开机，开机后加载驱动后会自动重启，在硬盘引导之前强制关机，准备上传到openstack
