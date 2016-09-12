@@ -49,7 +49,7 @@
 	3. 组策略对象编辑器 --> 添加 --> 确定
 	4. 本地计算机 策略 --> 计算机配置 --> Windows 设置 --> 脚本(启动/关机) --> 启动
 	5. 添加 --> 脚本路径 --> 确定 
-	6. 保存控制台
+	6. 保存控制台 --> 保存到默认路径下就可以了
 9. run sysperp
 	1. Untitled.xml拷贝到c:\Windows\System32\sysprep
 	2. sysprep /generalize /oobe /shutdown /unattend:C:\Windows\System32\sysprep\Untitled.xml
