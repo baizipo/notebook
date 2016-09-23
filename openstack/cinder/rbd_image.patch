@@ -1,0 +1,147 @@
+commit d47508bace35d9eaa58945a291ecd700b1eda72c
+Author: Ivan Kolodyazhny <e0ne@e0ne.info>
+Date:   Tue Jun 7 21:46:27 2016 +0300
+
+    Make RBDImageMetadata and RBDVolumeIOWrapper re-usable
+    
+    Now, both Cinder and os-brick projects have RBDVolumeIOWrapper and
+    RBDImageMetadata classes. This patch syncs code between them to remove
+    code duplication once new os-brick will be released.
+    
+    Change-Id: I7d2b2f6ff90b33fe614efd0ff10dbd3b933fd92e
+
+diff --git a/os_brick/initiator/connector.py b/os_brick/initiator/connector.py
+index 084dfa5..d2742cb 100644
+--- a/os_brick/initiator/connector.py
++++ b/os_brick/initiator/connector.py
+@@ -1959,13 +1959,15 @@ class RBDConnector(BaseLinuxConnector):
+         try:
+             user = connection_properties['auth_username']
+             pool, volume = connection_properties['name'].split('/')
++            conf = connection_properties.get('conffile')
+         except IndexError:
+             msg = _("Connect volume failed, malformed connection properties")
+             raise exception.BrickException(msg=msg)
+ 
+         rbd_client = linuxrbd.RBDClient(user, pool)
+         rbd_volume = linuxrbd.RBDVolume(rbd_client, volume)
+-        rbd_handle = linuxrbd.RBDVolumeIOWrapper(rbd_volume)
++        rbd_handle = linuxrbd.RBDVolumeIOWrapper(
++            linuxrbd.RBDImageMetadata(rbd_volume, pool, user, conf))
+         return rbd_handle
+ 
+     def connect_volume(self, connection_properties):
+diff --git a/os_brick/initiator/linuxrbd.py b/os_brick/initiator/linuxrbd.py
+index cd939bc..aa8d7e3 100644
+--- a/os_brick/initiator/linuxrbd.py
++++ b/os_brick/initiator/linuxrbd.py
+@@ -54,6 +54,8 @@ class RBDClient(object):
+                 err=_('rbd module required'))
+ 
+         self.rbd_conf = kwargs.get('conffile', '/etc/ceph/ceph.conf')
++        self.rbd_cluster_name = kwargs.get('rbd_cluster_name', 'ceph')
++        self.rados_connect_timeout = kwargs.get('rados_connect_timeout', -1)
+ 
+         self.client, self.ioctx = self.connect()
+ 
+@@ -64,11 +66,18 @@ class RBDClient(object):
+         self.disconnect()
+ 
+     def connect(self):
++        LOG.debug("opening connection to ceph cluster (timeout=%s).",
++                  self.rados_connect_timeout)
+         client = self.rados.Rados(rados_id=self.rbd_user,
++                                  clustername=self.rbd_cluster_name,
+                                   conffile=self.rbd_conf)
+ 
+         try:
+-            client.connect()
++            if self.rados_connect_timeout >= 0:
++                client.connect(
++                    timeout=self.configuration.rados_connect_timeout)
++            else:
++                client.connect()
+             ioctx = client.open_ioctx(self.rbd_pool)
+             return client, ioctx
+         except self.rados.Error:
+@@ -116,6 +125,15 @@ class RBDVolume(object):
+         return getattr(self.image, attrib)
+ 
+ 
++class RBDImageMetadata(object):
++    """RBD image metadata to be used with RBDVolumeIOWrapper."""
++    def __init__(self, image, pool, user, conf):
++        self.image = image
++        self.pool = encodeutils.safe_encode(pool or '')
++        self.user = encodeutils.safe_encode(user or '')
++        self.conf = encodeutils.safe_encode(conf or '')
++
++
+ class RBDVolumeIOWrapper(io.RawIOBase):
+     """Enables LibRBD.Image objects to be treated as Python IO objects.
+ 
+@@ -130,6 +148,22 @@ class RBDVolumeIOWrapper(io.RawIOBase):
+     def _inc_offset(self, length):
+         self._offset += length
+ 
++    @property
++    def rbd_image(self):
++        return self._rbd_volume.image
++
++    @property
++    def rbd_user(self):
++        return self._rbd_volume.user
++
++    @property
++    def rbd_pool(self):
++        return self._rbd_volume.pool
++
++    @property
++    def rbd_conf(self):
++        return self._rbd_volume.conf
++
+     def read(self, length=None):
+         offset = self._offset
+         total = self._rbd_volume.image.size()
+@@ -138,7 +172,7 @@ class RBDVolumeIOWrapper(io.RawIOBase):
+         # length (they just return nothing) but rbd images do so we need to
+         # return empty string if we have reached the end of the image.
+         if (offset >= total):
+-            return ''
++            return b''
+ 
+         if length is None:
+             length = total
+diff --git a/os_brick/tests/initiator/test_connector.py b/os_brick/tests/initiator/test_connector.py
+index c306c84..ae4efff 100644
+--- a/os_brick/tests/initiator/test_connector.py
++++ b/os_brick/tests/initiator/test_connector.py
+@@ -2303,6 +2303,7 @@ class RBDConnectorTestCase(ConnectorTestCase):
+ 
+         # Ensure rados is instantiated correctly
+         mock_rados.Rados.assert_called_once_with(
++            clustername='ceph',
+             rados_id=encodeutils.safe_encode(self.user),
+             conffile='/etc/ceph/ceph.conf')
+ 
+diff --git a/os_brick/tests/initiator/test_linuxrbd.py b/os_brick/tests/initiator/test_linuxrbd.py
+index ed33f56..d0da8b4 100644
+--- a/os_brick/tests/initiator/test_linuxrbd.py
++++ b/os_brick/tests/initiator/test_linuxrbd.py
+@@ -36,6 +36,7 @@ class RBDClientTestCase(base.TestCase):
+ 
+             # Assert connect is called with correct paramaters
+             mock_rados.Rados.assert_called_once_with(
++                clustername='ceph',
+                 rados_id=encodeutils.safe_encode('test_user'),
+                 conffile='/etc/ceph/ceph.conf')
+ 
+@@ -80,7 +81,7 @@ class RBDVolumeIOWrapperTestCase(base.TestCase):
+         self.assertEqual(self.full_data, data)
+ 
+         data = self.mock_volume_wrapper.read()
+-        self.assertEqual('', data)
++        self.assertEqual(b'', data)
+ 
+         self.mock_volume_wrapper.seek(0)
+         data = self.mock_volume_wrapper.read()

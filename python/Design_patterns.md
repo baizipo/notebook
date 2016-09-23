@@ -443,4 +443,141 @@ if __name__ == '__main__':
     main()
 ```
 
+# 结构型设计模式
+结构型设计模式处理一个系统中不同实体(比如，类和对象)之间的关系，关注的是提供一种简单的对象组合方式来创造新功能。
+
+## 适配器模式
+设配器模式(Adapter pattern)是一种结构型设计模式，帮助我们实现两个不兼容接口之间的兼容。我们可以编写一个额外的代码层，该代码层包含让两个接口之间能够通信需要进行的所有修改，这个代码层就交适配器。适配器模式遵从开放/封闭原则。(开放/封闭原则是面向对象设计的基本原则之一，声明一个软件实体应该对扩展是开放的，对修改是封闭的)
+
+```python
+class Synthesizer:
+    def __init__(self, name):
+        self.name = name
+
+    def __str__(self):
+        return 'the {} synthesizer'.format(self.name)
+
+    def play(self):
+        return 'is playing an eletrronic song'
+
+
+class Human:
+    def __init__(self, name):
+        self.name = name
+
+    def __str__(self):
+        return '{} the human'.format(self.name)
+
+    def speak(self):
+        return 'says hello'
+
+
+class Computer:
+    def __init__(self, name):
+        self.name = name
+
+    def __str__(self):
+        return 'the {} computer'.format(self.name)
+
+    def execute(self):
+        return 'executes a program'
+
+
+class Adapter:
+    def __init__(self, obj, adapted_methods):
+        self.obj = obj
+        self.__dict__.update(adapted_methods)
+
+    def __str__(self):
+        return str(self.obj)
+
+
+def main():
+    objects = [ Computer('Asus')]
+    synth = Synthesizer('moog')
+    objects.append(Adapter(synth, dict(execute=synth.play)))
+    human = Human('Bob')
+    objects.append(Adapter(human, dict(execute=human.speak)))
+
+    for i in objects:
+        print '{}, {}'.format(str(i), i.execute())
+
+if __name__ == '__main__':
+    main()
+```
+
+```python
+# http://ginstrom.com/scribbles/2008/11/06/generic-adapter-class-in-python/
+
+import os
+
+
+class Dog(object):
+    def __init__(self):
+        self.name = "Dog"
+
+    def bark(self):
+        return "woof!"
+
+
+class Cat(object):
+    def __init__(self):
+        self.name = "Cat"
+
+    def meow(self):
+        return "meow!"
+
+
+class Human(object):
+    def __init__(self):
+        self.name = "Human"
+
+    def speak(self):
+        return "'hello'"
+
+
+class Car(object):
+    def __init__(self):
+        self.name = "Car"
+
+    def make_noise(self, octane_level):
+        return "vroom%s" % ("!" * octane_level)
+
+
+class Adapter(object):
+    """
+    Adapts an object by replacing methods.
+    Usage:
+    dog = Dog
+    dog = Adapter(dog, dict(make_noise=dog.bark))
+    """
+    def __init__(self, obj, adapted_methods):
+        """We set the adapted methods in the object's dict"""
+        self.obj = obj
+        self.__dict__.update(adapted_methods)
+
+    def __getattr__(self, attr):
+        """All non-adapted calls are passed to the object"""
+        return getattr(self.obj, attr)
+
+
+def main():
+    objects = []
+    dog = Dog()
+    objects.append(Adapter(dog, dict(make_noise=dog.bark)))
+    cat = Cat()
+    objects.append(Adapter(cat, dict(make_noise=cat.meow)))
+    human = Human()
+    objects.append(Adapter(human, dict(make_noise=human.speak)))
+    car = Car()
+    car_noise = lambda: car.make_noise(3)
+    objects.append(Adapter(car, dict(make_noise=car_noise)))
+
+    for obj in objects:
+        print("A", obj.name, "goes", obj.make_noise())
+
+
+if __name__ == "__main__":
+    main()
+```
 
